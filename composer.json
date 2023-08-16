@@ -14,6 +14,38 @@
         }
     ],
     "extra": {
-        
+        "post-package-install":[
+            {
+                "cmd":["xqkeji\\composer\\Asset","copyDirs"],
+                "param":[{
+                    "vendor/xqkeji/xq-com-treegrid/src/":"resource/xq-treegrid/"
+                }]
+            }
+        ],
+        "post-package-update":[
+            {
+                "cmd":["xqkeji\\composer\\Asset","rmDirs"],
+                "param":[{
+                    "vendor/xqkeji/xq-com-treegrid/src/":"resource/xq-treegrid/"
+                }]
+            },
+            {
+                "cmd":["xqkeji\\composer\\Asset","copyDirs"],
+                "param":[{
+                    "vendor/xqkeji/xq-com-treegrid/src/":"resource/xq-treegrid/"
+                }]
+            }
+        ],
+        "post-package-uninstall":[
+            {
+                "cmd":["xqkeji\\composer\\Asset","rmDirs"],
+                "param":[{
+                    "vendor/xqkeji/xq-com-treegrid/src/":"resource/xq-treegrid/"
+                }]
+            }
+        ]
+    },
+    "require": {
+        "xqkeji/composer":"^1.0"
     }
 }
