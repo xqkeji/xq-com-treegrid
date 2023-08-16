@@ -1,0 +1,19 @@
+{
+    "name": "xqkeji/xq-com-treegrid",
+    "description": "新齐通用后台管理页面系统的可拖动的树状表格页面的js、css等前端程序的composer包。",
+    "type": "library",
+    "license": "SSPL-1.0",
+    "autoload": {
+        "psr-4": {
+            "xqkeji\\composer\\treegrid\\": ""
+        }
+    },
+    "authors": [
+        {
+            "name": "xqkeji.cn"
+        }
+    ],
+    "extra": {
+        
+    }
+}
