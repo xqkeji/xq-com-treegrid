@@ -1,8 +1,8 @@
 /*!
- * xq-treegrid v1.0.7 (https://xqkeji.cn/demo/xq-treegrid/)
+ * xq-treegrid v1.0.8 (https://xqkeji.cn/demo/xq-treegrid/)
  * Author xqkeji.cn
  * LICENSE SSPL-1.0
- * Copyright 2023 xqkeji.cn
+ * Copyright 2026 xqkeji.cn
  */
  "use strict";
 (() => {

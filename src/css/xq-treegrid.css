@@ -1,8 +1,8 @@
 /*!
- * xq-treegrid v1.0.7 (https://xqkeji.cn/demo/xq-treegrid/)
+ * xq-treegrid v1.0.8 (https://xqkeji.cn/demo/xq-treegrid/)
  * Author xqkeji.cn
  * LICENSE SSPL-1.0
- * Copyright 2023 xqkeji.cn
+ * Copyright 2026 xqkeji.cn
  */
  body {
   min-width: 744px;
@@ -50,7 +50,7 @@
   height: 18px;
   margin-top: 10px;
   position: relative;
-  background-image: url("/assets/images/indent.gif");
+  background-image: url("../images/indent.gif");
   background-position: -3px;
   float: left;
 }
@@ -61,7 +61,7 @@
   margin-top: 10px;
   position: relative;
   cursor: pointer;
-  background-image: url("/assets/images/indent.gif");
+  background-image: url("../images/indent.gif");
   background-position: -3px;
   float: left;
 }
@@ -72,11 +72,11 @@ td span.xq-treegrid-indent:first-child {
 }
 
 .xq-treegrid-expander-expanded {
-  background-image: url("/assets/images/collapse.png");
+  background-image: url("../images/collapse.png");
 }
 
 .xq-treegrid-expander-collapsed {
-  background-image: url("/assets/images/expand.png");
+  background-image: url("../images/expand.png");
 }
 
 .xq-treegrid .xq-copy {
