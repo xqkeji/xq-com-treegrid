@@ -1,5 +1,5 @@
 /*!
- * xq-treegrid v1.0.8 (https://xqkeji.cn/demo/xq-treegrid/)
+ * xq-treegrid v1.0.9 (https://xqkeji.cn/demo/xq-treegrid/)
  * Author xqkeji.cn
  * LICENSE SSPL-1.0
  * Copyright 2026 xqkeji.cn
@@ -1694,14 +1694,7 @@
     if (!isLeaf(element)) {
       const id = getNodeId(element);
       const children = getChildNodes(id);
-      const elementBody = element.parentElement;
-      let previousBody = elementBody;
       for (const child of children) {
-        const childBody = child.parentElement;
-        if (previousBody !== childBody && !is_parent) {
-          previousBody.after(childBody);
-        }
-        previousBody = childBody;
         reloadNode(child);
         if (!isLeaf(child)) {
           reinitNode(child);
@@ -1824,30 +1817,28 @@
     }
   };
 
-  // src/ts/xq-previous.ts
-  var getPrevious = (element) => {
-    const previousElement = element.previousElementSibling;
-    const tr = previousElement.querySelector("tr");
-    if (tr) {
-      if (tr.classList.contains("d-none")) {
-        return getPrevious(previousElement);
-      }
-      return previousElement;
-    }
-    return null;
-  };
-
   // src/ts/xq-drag.ts
   var next = (element, selector) => {
     const depth = Number.parseInt(element.getAttribute("depth"), 10);
     const parent = element.parentElement;
-    let next2 = parent.nextElementSibling;
-    let nextElement = next2.firstElementChild;
-    let elementDepth = Number.parseInt(nextElement.getAttribute("depth"), 10);
-    if (next2.tagName == "TFOOT") {
+    if (!parent)
       return null;
-    }
+    let next2 = parent.nextElementSibling;
     while (next2) {
+      if (next2.tagName === "TFOOT") {
+        return null;
+      }
+      const nextElement = next2.firstElementChild;
+      if (!nextElement) {
+        next2 = next2.nextElementSibling;
+        continue;
+      }
+      const elementDepthAttr = nextElement.getAttribute("depth");
+      if (!elementDepthAttr) {
+        next2 = next2.nextElementSibling;
+        continue;
+      }
+      const elementDepth = Number.parseInt(elementDepthAttr, 10);
       if (elementDepth > depth) {
         return null;
       }
@@ -1855,20 +1846,16 @@
         return nextElement;
       }
       next2 = next2.nextElementSibling;
-      nextElement = next2.firstElementChild;
-      elementDepth = Number.parseInt(nextElement.getAttribute("depth"), 10);
-      if (next2.tagName == "TFOOT") {
-        return null;
-      }
     }
     return null;
   };
   var dragElement = (e) => {
     const { item } = e.detail;
+    if (!item)
+      return;
     const tr = item.querySelector("tr");
     if (tr && !isLeaf(tr)) {
-      const node = item.querySelector("tr");
-      const childNodes = getChildNodes(getNodeId(node));
+      const childNodes = getChildNodes(getNodeId(tr));
       for (const child of childNodes) {
         item.append(child);
       }
@@ -1876,18 +1863,22 @@
   };
   var dropElement = (e) => {
     let { item } = e.detail;
+    if (!item)
+      return;
     const trs = item.querySelectorAll("tbody>tr:not(:first-child)");
-    if (trs) {
-      const table2 = getTable();
-      for (const tr of trs) {
-        const trId = tr.getAttribute("id");
-        const tbodyId = "#tbody_" + trId;
-        const tbody = table2.querySelector(tbodyId);
-        if (tbody) {
-          item.after(tbody);
-          item = tbody;
-          tbody.append(tr);
-        }
+    if (!trs.length)
+      return;
+    const table2 = getTable();
+    for (const tr of trs) {
+      const trId = tr.getAttribute("id");
+      if (!trId)
+        continue;
+      const tbodyId = "#tbody_" + trId;
+      const tbody = table2.querySelector(tbodyId);
+      if (tbody) {
+        item.after(tbody);
+        item = tbody;
+        tbody.append(tr);
       }
     }
   };
@@ -1895,48 +1886,162 @@
     const dragger_table = getTable();
     const { offsetLeft } = dragger_table;
     const detail = e.detail;
+    if (!detail)
+      return;
     const element = detail.item;
+    if (!element)
+      return;
     const td = element.querySelector("td:first-child");
     const tr = element.querySelector("tr");
+    if (!td || !tr)
+      return;
     const { offsetWidth } = td;
     const offset2 = detail.dragEvent.pageX - offsetLeft - offsetWidth - 10;
-    const previousElement = getPrevious(element);
-    const pTr = previousElement.querySelector("tr");
+    const previousElement = findPreviousVisible(element);
+    if (!previousElement) {
+      setTopNode(tr);
+      const data = getData(tr);
+      moveNode(data, tr);
+      return;
+    }
     if (previousElement.tagName === "THEAD") {
       setTopNode(tr);
       const data = getData(tr);
-      moveNode(data);
-    } else if (offset2 > 0) {
-      if (isExpander(pTr)) {
-        decNode(tr, pTr);
-        const data = getData(tr);
-        moveNode(data);
-      } else {
-        expanderNode(pTr, () => {
-          decNode(tr, pTr);
-          const data = getData(tr);
-          moveNode(data);
-        });
-      }
+      moveNode(data, tr);
     } else {
-      eqNode(tr, pTr);
+      const pTr = previousElement.querySelector("tr");
+      if (!pTr)
+        return;
+      const elementDepth = getDepth(tr);
+      const previousDepth = getDepth(pTr);
+      if (offset2 > 0) {
+        if (isExpander(pTr)) {
+          decNode(tr, pTr);
+        } else {
+          expanderNode(pTr, () => {
+            decNode(tr, pTr);
+          });
+        }
+      } else {
+        if (elementDepth === previousDepth) {
+          if (elementDepth > 1) {
+            const parent = getParent(tr);
+            if (parent) {
+              eqNode(tr, parent);
+            } else {
+              setTopNode(tr);
+            }
+          } else {
+            eqNode(tr, pTr);
+          }
+        } else if (previousDepth < elementDepth) {
+          eqNode(tr, pTr);
+        } else {
+          const parent = getParent(tr);
+          if (parent) {
+            eqNode(tr, parent);
+          } else {
+            setTopNode(tr);
+          }
+        }
+      }
       const data = getData(tr);
-      moveNode(data);
+      moveNode(data, tr);
+      reorderTree();
     }
+  };
+  var findPreviousVisible = (element) => {
+    let current = element.previousElementSibling;
+    while (current) {
+      if (current.tagName === "THEAD") {
+        return current;
+      }
+      const tr = current.querySelector("tr");
+      if (tr && !tr.classList.contains("d-none")) {
+        return current;
+      }
+      current = current.previousElementSibling;
+    }
+    return null;
+  };
+  var reorderTree = () => {
+    const table2 = getTable();
+    const allTbodies = table2.querySelectorAll("tbody");
+    const tbodyMap = /* @__PURE__ */ new Map();
+    allTbodies.forEach((tbody) => {
+      const tr = tbody.querySelector("tr");
+      if (tr) {
+        tbodyMap.set(getNodeId(tr), tbody);
+      }
+    });
+    const sortedTbodies = [];
+    const topNodes = table2.querySelectorAll('tbody > tr[depth="1"]');
+    const existingOrder = /* @__PURE__ */ new Map();
+    let order = 0;
+    allTbodies.forEach((tbody) => {
+      const tr = tbody.querySelector("tr");
+      if (tr) {
+        existingOrder.set(getNodeId(tr), order++);
+      }
+    });
+    const traverse = (parentId) => {
+      const children = table2.querySelectorAll(`tbody > tr[pid="${parentId.replace("xq_", "")}"]`);
+      const childArray = [];
+      children.forEach((child) => {
+        childArray.push(child);
+      });
+      childArray.sort((a, b) => {
+        const orderA = existingOrder.get(getNodeId(a)) || 0;
+        const orderB = existingOrder.get(getNodeId(b)) || 0;
+        return orderA - orderB;
+      });
+      childArray.forEach((child) => {
+        const tbody = tbodyMap.get(getNodeId(child));
+        if (tbody) {
+          sortedTbodies.push(tbody);
+          traverse(getNodeId(child));
+        }
+      });
+    };
+    const topArray = [];
+    topNodes.forEach((node) => {
+      topArray.push(node);
+    });
+    topArray.sort((a, b) => {
+      const idA = getNodeId(a).replace("xq_", "");
+      const idB = getNodeId(b).replace("xq_", "");
+      return idA.localeCompare(idB, void 0, { numeric: true });
+    });
+    topArray.forEach((topNode) => {
+      const tbody = tbodyMap.get(getNodeId(topNode));
+      if (tbody) {
+        sortedTbodies.push(tbody);
+        traverse(getNodeId(topNode));
+      }
+    });
+    const thead = table2.querySelector("thead");
+    let lastElement = thead || table2.firstChild;
+    sortedTbodies.forEach((tbody) => {
+      if (lastElement.nextElementSibling !== tbody) {
+        lastElement.after(tbody);
+      }
+      lastElement = tbody;
+    });
   };
   var getData = (tr) => {
     const data = { id: "", pid: "", nextid: "" };
     data.id = getNodeId(tr).replace("xq_", "");
-    data.pid = getParentId(tr);
-    const nextTr = next(tr, 'tr[pid="' + data.pid + '"]');
-    if (nextTr) {
-      data.nextid = getNodeId(nextTr).replace("xq_", "");
-    } else {
-      data.nextid = "";
+    data.pid = getParentId(tr) || "";
+    const tbody = tr.parentElement;
+    if (tbody) {
+      const nextTr = next(tbody, 'tr[pid="' + data.pid + '"]');
+      if (nextTr) {
+        data.nextid = getNodeId(nextTr).replace("xq_", "");
+      }
     }
     return data;
   };
-  var moveNode = (data) => {
+  var moveNode = (data, tr) => {
     let moveUrl;
     const xq_url = getOption("xq-url");
     if (!xq_url) {
@@ -1954,32 +2059,49 @@
       },
       method: "POST"
     }).then(async (response) => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
       return response.json();
-    }).then((data2) => {
-      console.log(data2);
+    }).then((responseData) => {
+      console.log(responseData);
+      if (responseData && responseData.success !== false) {
+        const table2 = getTable();
+        const tbodyId = "#tbody_xq_" + data.id;
+        const tbody = table2.querySelector(tbodyId);
+        if (tbody) {
+          const currentTr = tbody.querySelector("tr");
+          if (currentTr) {
+            currentTr.setAttribute("pid", data.pid);
+            reinitNode(currentTr);
+          }
+        }
+      }
+    }).catch((error) => {
+      console.error("Move node failed:", error);
     });
   };
   var dragerTable = () => {
     const tableClass = getOption("tableClass");
     const dragClass = getOption("dragClass");
     const dragger_table = document.querySelector(tableClass + dragClass);
-    if (dragger_table) {
-      sortable(dragger_table, {
-        items: "tbody",
-        handle: ".xq-move",
-        placeholder: '<tbody><tr><td colspan="99">&nbsp;</td></tr><tbody>'
-      });
-      dragger_table.addEventListener("sortstart", (e) => {
-        dragElement(e);
-      });
-      dragger_table.addEventListener("sortstop", (e) => {
-        const event = e.detail.dragEvent;
-        if (event.type === "dragend") {
-          dropElement(e);
-          dragUpdate(e);
-        }
-      });
-    }
+    if (!dragger_table)
+      return;
+    sortable(dragger_table, {
+      items: "tbody",
+      handle: ".xq-move",
+      placeholder: '<tbody><tr><td colspan="99">&nbsp;</td></tr><tbody>'
+    });
+    dragger_table.addEventListener("sortstart", (e) => {
+      dragElement(e);
+    });
+    dragger_table.addEventListener("sortstop", (e) => {
+      const event = e.detail?.dragEvent;
+      if (event && event.type === "dragend") {
+        dropElement(e);
+        dragUpdate(e);
+      }
+    });
   };
   var xq_drag_default = dragerTable;
 
