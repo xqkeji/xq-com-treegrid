@@ -39,14 +39,18 @@
   };
   var getOption = (key) => {
     if (key in treegridOptions) {
-      return treegridOptions[key];
+      const value = treegridOptions[key];
+      if (value === void 0 || value === null) {
+        return DEFAULT_OPTIONS[key];
+      }
+      return value;
     }
     const tableClass = treegridOptions["tableClass"];
     const table2 = document.querySelector(tableClass);
     if (table2.hasAttribute(key)) {
       return String(table2.getAttribute(key));
     }
-    return "";
+    return DEFAULT_OPTIONS[key];
   };
 
   // src/ts/xq-table.ts
@@ -1882,9 +1886,7 @@
       }
     }
   };
-  var dragUpdate = (e) => {
-    const dragger_table = getTable();
-    const { offsetLeft } = dragger_table;
+  var dragUpdate = (e, startX, stopX, minX, maxX) => {
     const detail = e.detail;
     if (!detail)
       return;
@@ -1895,8 +1897,32 @@
     const tr = element.querySelector("tr");
     if (!td || !tr)
       return;
-    const { offsetWidth } = td;
-    const offset2 = detail.dragEvent.pageX - offsetLeft - offsetWidth - 10;
+    let shouldLeftMove = false;
+    let shouldRightMove = false;
+    let threshold = 30;
+    const dragOffset = getOption("dragOffset");
+    if (dragOffset !== void 0 && dragOffset !== null && !isNaN(Number(dragOffset))) {
+      threshold = Math.abs(Number(dragOffset));
+    }
+    if (minX !== void 0 && maxX !== void 0 && isFinite(minX) && isFinite(maxX) && (minX !== startX || maxX !== startX)) {
+      const leftDistance = startX - minX;
+      const rightDistance = maxX - startX;
+      if (leftDistance > rightDistance && leftDistance > threshold) {
+        shouldLeftMove = true;
+        shouldRightMove = false;
+      } else if (rightDistance > leftDistance && rightDistance > threshold) {
+        shouldLeftMove = false;
+        shouldRightMove = true;
+      } else {
+        shouldLeftMove = false;
+        shouldRightMove = false;
+      }
+    } else {
+      const finalStopX = stopX ?? (detail.dragEvent?.pageX ?? detail.dragEvent?.screenX ?? detail.dragEvent?.clientX ?? startX);
+      const deltaX = finalStopX - startX;
+      shouldLeftMove = deltaX < -threshold;
+      shouldRightMove = deltaX > threshold;
+    }
     const previousElement = findPreviousVisible(element);
     if (!previousElement) {
       setTopNode(tr);
@@ -1912,9 +1938,14 @@
       const pTr = previousElement.querySelector("tr");
       if (!pTr)
         return;
-      const elementDepth = getDepth(tr);
-      const previousDepth = getDepth(pTr);
-      if (offset2 > 0) {
+      if (shouldLeftMove) {
+        const pParent = getParent(pTr);
+        if (pParent) {
+          eqNode(tr, pParent);
+        } else {
+          setTopNode(tr);
+        }
+      } else if (shouldRightMove) {
         if (isExpander(pTr)) {
           decNode(tr, pTr);
         } else {
@@ -1923,27 +1954,7 @@
           });
         }
       } else {
-        if (elementDepth === previousDepth) {
-          if (elementDepth > 1) {
-            const parent = getParent(tr);
-            if (parent) {
-              eqNode(tr, parent);
-            } else {
-              setTopNode(tr);
-            }
-          } else {
-            eqNode(tr, pTr);
-          }
-        } else if (previousDepth < elementDepth) {
-          eqNode(tr, pTr);
-        } else {
-          const parent = getParent(tr);
-          if (parent) {
-            eqNode(tr, parent);
-          } else {
-            setTopNode(tr);
-          }
-        }
+        eqNode(tr, pTr);
       }
       const data = getData(tr);
       moveNode(data, tr);
@@ -2008,9 +2019,9 @@
       topArray.push(node);
     });
     topArray.sort((a, b) => {
-      const idA = getNodeId(a).replace("xq_", "");
-      const idB = getNodeId(b).replace("xq_", "");
-      return idA.localeCompare(idB, void 0, { numeric: true });
+      const orderA = existingOrder.get(getNodeId(a)) || 0;
+      const orderB = existingOrder.get(getNodeId(b)) || 0;
+      return orderA - orderB;
     });
     topArray.forEach((topNode) => {
       const tbody = tbodyMap.get(getNodeId(topNode));
@@ -2087,20 +2098,66 @@
     const dragger_table = document.querySelector(tableClass + dragClass);
     if (!dragger_table)
       return;
+    if (dragger_table.hasAttribute("data-xq-drag-initialized")) {
+      return;
+    }
+    dragger_table.setAttribute("data-xq-drag-initialized", "true");
     sortable(dragger_table, {
       items: "tbody",
       handle: ".xq-move",
       placeholder: '<tbody><tr><td colspan="99">&nbsp;</td></tr><tbody>'
     });
+    let dragStartX = 0;
+    let dragMinX = Infinity;
+    let dragMaxX = -Infinity;
+    let isDragging = false;
+    const handleDrag = (e) => {
+      if (!isDragging)
+        return;
+      const event = e;
+      const mouseEvent = e;
+      const currentX = event.screenX ?? mouseEvent.screenX ?? event.pageX ?? mouseEvent.pageX ?? event.clientX ?? mouseEvent.clientX;
+      if (currentX !== 0 && isFinite(currentX)) {
+        if (currentX < dragMinX)
+          dragMinX = currentX;
+        if (currentX > dragMaxX)
+          dragMaxX = currentX;
+      }
+    };
+    const checkBoundaryExit = () => {
+      if (!isDragging)
+        return;
+      if (dragMinX === dragStartX && dragMaxX > dragStartX) {
+        const estimatedMinX = Math.max(0, dragStartX - 500);
+        if (estimatedMinX < dragMinX) {
+          dragMinX = estimatedMinX;
+        }
+      }
+    };
     dragger_table.addEventListener("sortstart", (e) => {
       dragElement(e);
+      isDragging = true;
+      const dragEvent = e.detail?.dragEvent;
+      dragStartX = dragEvent?.screenX ?? dragEvent?.pageX ?? dragEvent?.clientX ?? 0;
+      dragMinX = dragStartX;
+      dragMaxX = dragStartX;
+      document.addEventListener("drag", handleDrag);
+      document.addEventListener("dragover", handleDrag);
+      document.addEventListener("dragend", handleDrag);
+      document.addEventListener("mousemove", handleDrag);
     });
     dragger_table.addEventListener("sortstop", (e) => {
+      document.removeEventListener("drag", handleDrag);
+      document.removeEventListener("dragover", handleDrag);
+      document.removeEventListener("dragend", handleDrag);
+      document.removeEventListener("mousemove", handleDrag);
       const event = e.detail?.dragEvent;
       if (event && event.type === "dragend") {
+        checkBoundaryExit();
         dropElement(e);
-        dragUpdate(e);
+        dragUpdate(e, dragStartX, void 0, dragMinX, dragMaxX);
       }
+      isDragging = false;
     });
   };
   var xq_drag_default = dragerTable;
@@ -2110,6 +2167,10 @@
     setOption(options);
     const table2 = getTable();
     if (table2) {
+      if (table2.hasAttribute("data-xq-treegrid-initialized")) {
+        return;
+      }
+      table2.setAttribute("data-xq-treegrid-initialized", "true");
       build(table2);
       const top_nodes = getTopNodes();
       if (top_nodes) {
