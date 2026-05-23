@@ -1,5 +1,5 @@
 /*!
- * xq-treegrid v1.0.9 (https://xqkeji.cn/demo/xq-treegrid/)
+ * xq-treegrid v1.0.10 (https://xqkeji.cn/demo/xq-treegrid/)
  * Author xqkeji.cn
  * LICENSE SSPL-1.0
  * Copyright 2026 xqkeji.cn
@@ -1844,7 +1844,8 @@
       }
       const elementDepth = Number.parseInt(elementDepthAttr, 10);
       if (elementDepth > depth) {
-        return null;
+        next2 = next2.nextElementSibling;
+        continue;
       }
       if (nextElement.matches(selector)) {
         return nextElement;
@@ -2043,12 +2044,9 @@
     const data = { id: "", pid: "", nextid: "" };
     data.id = getNodeId(tr).replace("xq_", "");
     data.pid = getParentId(tr) || "";
-    const tbody = tr.parentElement;
-    if (tbody) {
-      const nextTr = next(tbody, 'tr[pid="' + data.pid + '"]');
-      if (nextTr) {
-        data.nextid = getNodeId(nextTr).replace("xq_", "");
-      }
+    const nextTr = next(tr, 'tr[pid="' + data.pid + '"]');
+    if (nextTr) {
+      data.nextid = getNodeId(nextTr).replace("xq_", "");
     }
     return data;
   };
